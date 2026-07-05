@@ -1,0 +1,37 @@
+name: Snakemake CI
+
+on:
+  push:
+    branches: [main, benchmark]
+  pull_request:
+    branches: [main, benchmark]
+
+jobs:
+  lint-and-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: "3.11"
+
+      - name: Install Snakemake
+        run: |
+          conda install -y -c bioconda -c conda-forge snakemake
+          python -m pip install flake8
+
+      - name: Lint Python scripts
+        run: |
+          flake8 --max-line-length=120 --extend-ignore=E501,W503 \
+            pre_analysis.py LGB_celltype.py LGB_genotype.py \
+            scVI/scVI_analysis_celltype.py scVI/scVI_analysis_genotype.py
+
+      - name: Validate Snakefile syntax
+        run: python -m py_compile pre_analysis.py LGB_celltype.py LGB_genotype.py scVI/scVI_analysis_celltype.py scVI/scVI_analysis_genotype.py
+
+      - name: Snakemake dry run
+        run: snakemake -n --cores 1

@@ -1,0 +1,7 @@
+*
+!*/
+!*.py
+!*.slurm
+!*.md
+!Snakefile
+!.github/
