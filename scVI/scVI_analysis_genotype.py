@@ -6,8 +6,8 @@ import scanpy as sc
 import scvi
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
-    classification_report, f1_score, precision_score, 
-    recall_score, accuracy_score, roc_auc_score, 
+    classification_report, f1_score, precision_score,
+    recall_score, accuracy_score, roc_auc_score,
     precision_recall_curve, auc, roc_curve
 )
 from sklearn.model_selection import StratifiedKFold
@@ -45,9 +45,9 @@ sc.pp.log1p(adata)
 # Subset the global anndata object down to 5000 genes
 # This shifts and slices both .X and layers['counts'] automatically without index mismatches
 sc.pp.highly_variable_genes(
-    adata, 
-    n_top_genes=5000, 
-    flavor="seurat", 
+    adata,
+    n_top_genes=5000,
+    flavor="seurat",
     subset=True
 )
 
@@ -68,15 +68,17 @@ n_classes = len(le_geo.classes_)
 # ==============================================================================
 # EVALUATION METRICS & PLOTTER UTILITIES
 # ==============================================================================
+
+
 def calculate_and_save_metrics(y_true, y_pred, y_prob, output_dir, prefix=""):
     acc = accuracy_score(y_true, y_pred)
     prec = precision_score(y_true, y_pred, average="macro", zero_division=0)
     rec = recall_score(y_true, y_pred, average="macro", zero_division=0)
     f1 = f1_score(y_true, y_pred, average="macro", zero_division=0)
-    
+
     y_true_bin = label_binarize(y_true, classes=np.arange(n_classes))
     roc_auc = roc_auc_score(y_true_bin, y_prob, average="macro", multi_class="ovr")
-    
+
     aupr_list = []
     for i in range(n_classes):
         if np.sum(y_true_bin[:, i]) > 0:
@@ -110,7 +112,13 @@ def generate_curves(y_true, y_prob, output_dir, prefix=""):
     if valid_classes > 0:
         mean_tpr /= valid_classes
         macro_auc = roc_auc_score(y_true_bin, y_prob, average="macro", multi_class="ovr")
-        ax.plot(fpr_grid, mean_tpr, label=f"Macro-average (AUC = {macro_auc:.3f})", color="black", lw=3.0, linestyle="--")
+        ax.plot(
+            fpr_grid,
+            mean_tpr,
+            label=f"Macro-average (AUC = {macro_auc:.3f})",
+            color="black",
+            lw=3.0,
+            linestyle="--")
 
     ax.plot([0, 1], [0, 1], color="gray", lw=1, linestyle="--")
     ax.set_xlabel("False Positive Rate", fontsize=11)
@@ -137,11 +145,20 @@ def generate_curves(y_true, y_prob, output_dir, prefix=""):
             valid_classes += 1
     if valid_classes > 0:
         mean_precision /= valid_classes
-        ax.plot(recall_grid, mean_precision, label=f"Macro-average (AUPR = {np.mean(aupr_list):.3f})", color="black", lw=3.0, linestyle="--")
+        ax.plot(
+            recall_grid,
+            mean_precision,
+            label=f"Macro-average (AUPR = {np.mean(aupr_list):.3f})",
+            color="black",
+            lw=3.0,
+            linestyle="--")
 
     ax.set_xlabel("Recall", fontsize=11)
     ax.set_ylabel("Precision", fontsize=11)
-    ax.set_title(f"{prefix.upper()} Precision-Recall (AUPR) Curve [scANVI Genotype Baseline]", fontsize=13, fontweight='bold')
+    ax.set_title(
+        f"{prefix.upper()} Precision-Recall (AUPR) Curve [scANVI Genotype Baseline]",
+        fontsize=13,
+        fontweight='bold')
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=8, ncol=2, frameon=True)
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, f"{prefix}pr_curve.png"), dpi=300)
@@ -161,20 +178,20 @@ oof_probs = np.zeros((len(adata), n_classes))
 
 for fold, (train_idx, test_idx) in enumerate(skf.split(adata.X, y_geo)):
     print(f"\n--- Processing scANVI Genotype Classifier Fold {fold+1}/5 ---")
-    
+
     adata_train = adata[train_idx].copy()
     adata_test = adata[test_idx].copy()
-    
+
     # Step A: Setup and Train underlying unsupervised scVI model
     scvi.model.SCVI.setup_anndata(adata_train)
     scvi_seed_model = scvi.model.SCVI(adata_train, n_latent=100)
     scvi_seed_model.train(
-        max_epochs=150, 
-        early_stopping=True, 
-        accelerator="gpu", 
+        max_epochs=150,
+        early_stopping=True,
+        accelerator="gpu",
         enable_progress_bar=False
     )
-    
+
     # Step B: Spin up semi-supervised classifier (scANVI) from seed weights
     scanvi_model = scvi.model.SCANVI.from_scvi_model(
         scvi_seed_model,
@@ -182,34 +199,40 @@ for fold, (train_idx, test_idx) in enumerate(skf.split(adata.X, y_geo)):
         unlabeled_category="Unknown"
     )
     scanvi_model.train(
-        max_epochs=30, 
-        accelerator="gpu", 
+        max_epochs=30,
+        accelerator="gpu",
         enable_progress_bar=False
     )
-    
+
     # Step C: Evaluate natively on the withheld fold partition
     y_pred_str = scanvi_model.predict(adata_test)
-    y_prob_unseen = scanvi_model.predict(adata_test, soft=True) 
-    
+    y_prob_unseen = scanvi_model.predict(adata_test, soft=True)
+
     # Map predictions back to uniform integer IDs for global tracking arrays
     y_true_fold = y_geo[test_idx]
     y_pred_fold = le_geo.transform(y_pred_str)
-    
+
     # Store fold results into the out-of-fold master matrix slots
     oof_preds[test_idx] = y_pred_fold
     oof_probs[test_idx] = y_prob_unseen.values
-    
+
     # Save isolated fold diagnostics
     fold_dir = os.path.join(SCANVI_DIR, f"fold_{fold+1}")
     os.makedirs(fold_dir, exist_ok=True)
-    
+
     with open(os.path.join(fold_dir, "classification_report.txt"), "w") as f:
-        f.write(classification_report(y_true_fold, y_pred_fold, labels=np.arange(n_classes), target_names=le_geo.classes_, zero_division=0))
-        
+        f.write(
+            classification_report(
+                y_true_fold,
+                y_pred_fold,
+                labels=np.arange(n_classes),
+                target_names=le_geo.classes_,
+                zero_division=0))
+
     np.save(os.path.join(fold_dir, "y_true.npy"), y_true_fold)
     np.save(os.path.join(fold_dir, "y_pred.npy"), y_pred_fold)
     np.save(os.path.join(fold_dir, "y_prob.npy"), y_prob_unseen.values)
-    
+
     calculate_and_save_metrics(y_true_fold, y_pred_fold, y_prob_unseen.values, fold_dir)
     generate_curves(y_true_fold, y_prob_unseen.values, fold_dir)
     print(f"Fold {fold+1} localized logs finalized.")
@@ -220,7 +243,13 @@ for fold, (train_idx, test_idx) in enumerate(skf.split(adata.X, y_geo)):
 print("\n=== GENERATING MASTER OVERALL CROSS-VALIDATION PERFORMANCE REPORTS ===")
 
 with open(os.path.join(SCANVI_DIR, "overall_classification_report.txt"), "w") as f:
-    f.write(classification_report(y_geo, oof_preds, labels=np.arange(n_classes), target_names=le_geo.classes_, zero_division=0))
+    f.write(
+        classification_report(
+            y_geo,
+            oof_preds,
+            labels=np.arange(n_classes),
+            target_names=le_geo.classes_,
+            zero_division=0))
 
 np.save(os.path.join(SCANVI_DIR, "oof_true.npy"), y_geo)
 np.save(os.path.join(SCANVI_DIR, "oof_pred.npy"), oof_preds)

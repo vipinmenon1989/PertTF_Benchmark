@@ -6,8 +6,8 @@ import scanpy as sc
 import optuna
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
-    classification_report, f1_score, precision_score, 
-    recall_score, accuracy_score, roc_auc_score, 
+    classification_report, f1_score, precision_score,
+    recall_score, accuracy_score, roc_auc_score,
     precision_recall_curve, auc, roc_curve
 )
 from sklearn.model_selection import StratifiedKFold, train_test_split
@@ -41,9 +41,9 @@ sc.pp.log1p(adata)
 # Step C: Isolate 5000 Highly Variable Genes (HVGs) with seed control
 print("Extracting top 5000 highly variable gene transcripts...")
 sc.pp.highly_variable_genes(
-    adata, 
-    n_top_genes=5000, 
-    flavor="seurat", 
+    adata,
+    n_top_genes=5000,
+    flavor="seurat",
     subset=True
 )
 
@@ -84,7 +84,7 @@ def calculate_and_save_metrics(y_true, y_pred, y_prob, output_dir, prefix=""):
         f1 = f1_score(y_true, y_pred, average="macro", zero_division=0)
         y_true_bin = label_binarize(y_true, classes=np.arange(n_classes))
         roc_auc = roc_auc_score(y_true_bin, y_prob, average="macro", multi_class="ovr")
-        
+
         aupr_list = []
         for i in range(n_classes):
             if np.sum(y_true_bin[:, i]) > 0:
@@ -122,14 +122,20 @@ def generate_curves(y_true, y_prob, output_dir, prefix=""):
         if valid_classes > 0:
             mean_tpr /= valid_classes
             macro_auc = roc_auc_score(y_true_bin, y_prob, average="macro", multi_class="ovr")
-            ax.plot(fpr_grid, mean_tpr, label=f"Macro-average (AUC = {macro_auc:.3f})", color="black", lw=3.0, linestyle="--")
+            ax.plot(
+                fpr_grid,
+                mean_tpr,
+                label=f"Macro-average (AUC = {macro_auc:.3f})",
+                color="black",
+                lw=3.0,
+                linestyle="--")
 
     ax.plot([0, 1], [0, 1], color="gray", lw=1, linestyle="--")
     ax.set_xlabel("False Positive Rate", fontsize=11)
     ax.set_ylabel("True Positive Rate", fontsize=11)
     ax.set_title(f"{prefix.upper()} Receiver Operating Characteristic (ROC) Curve", fontsize=13, fontweight='bold')
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=8, ncol=2, frameon=True)
-    
+
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, f"{prefix}roc_curve.png"), dpi=300)
     plt.savefig(os.path.join(output_dir, f"{prefix}roc_curve.pdf"), format="pdf")
@@ -154,13 +160,19 @@ def generate_curves(y_true, y_prob, output_dir, prefix=""):
                 valid_classes += 1
         if valid_classes > 0:
             mean_precision /= valid_classes
-            ax.plot(recall_grid, mean_precision, label=f"Macro-average (AUPR = {np.mean(aupr_list):.3f})", color="black", lw=3.0, linestyle="--")
+            ax.plot(
+                recall_grid,
+                mean_precision,
+                label=f"Macro-average (AUPR = {np.mean(aupr_list):.3f})",
+                color="black",
+                lw=3.0,
+                linestyle="--")
 
     ax.set_xlabel("Recall", fontsize=11)
     ax.set_ylabel("Precision", fontsize=11)
     ax.set_title(f"{prefix.upper()} Precision-Recall (AUPR) Curve", fontsize=13, fontweight='bold')
     ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), fontsize=8, ncol=2, frameon=True)
-    
+
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, f"{prefix}pr_curve.png"), dpi=300)
     plt.savefig(os.path.join(output_dir, f"{prefix}pr_curve.pdf"), format="pdf")
@@ -181,8 +193,16 @@ def optimize_hyperparameters(X_t_train, y_t_train, X_t_val, y_t_val, n_trials=50
         }
         dtrain = lgb.Dataset(X_t_train, label=y_t_train)
         dval = lgb.Dataset(X_t_val, label=y_t_val, reference=dtrain)
-        
-        model = lgb.train(params, dtrain, num_boost_round=150, valid_sets=[dval], callbacks=[lgb.early_stopping(10, verbose=False)])
+
+        model = lgb.train(
+            params,
+            dtrain,
+            num_boost_round=150,
+            valid_sets=[dval],
+            callbacks=[
+                lgb.early_stopping(
+                    10,
+                    verbose=False)])
         preds = model.predict(X_t_val)
         y_pred = np.argmax(preds, axis=1) if n_classes > 2 else (preds > 0.5).astype(int)
         return f1_score(y_t_val, y_pred, average="macro")
@@ -211,18 +231,28 @@ for fold, (train_idx, test_idx) in enumerate(skf.split(X_df, y_cell)):
     X_test_rand, Y_test_rand = X_df.iloc[test_idx], y_cell[test_idx]
 
     TUNE_SIZE_RAND = min(15000, len(X_train_rand))
-    _, X_tune_rand, _, y_tune_rand = train_test_split(X_train_rand, Y_train_rand, test_size=TUNE_SIZE_RAND/len(X_train_rand), stratify=Y_train_rand, random_state=42)
-    X_r_train, X_r_val, y_r_train, y_r_val = train_test_split(X_tune_rand, y_tune_rand, test_size=0.2, stratify=y_tune_rand, random_state=42)
+    _, X_tune_rand, _, y_tune_rand = train_test_split(
+        X_train_rand, Y_train_rand, test_size=TUNE_SIZE_RAND / len(X_train_rand), stratify=Y_train_rand, random_state=42)
+    X_r_train, X_r_val, y_r_train, y_r_val = train_test_split(
+        X_tune_rand, y_tune_rand, test_size=0.2, stratify=y_tune_rand, random_state=42)
 
     best_params_rand = optimize_hyperparameters(X_r_train, y_r_train, X_r_val, y_r_val, n_trials=50)
 
     rand_train_dataset = lgb.Dataset(X_train_rand, label=Y_train_rand)
-    final_params_rand = {"objective": obj, "metric": metric, "num_class": n_classes if n_classes > 2 else 1, "boosting_type": "gbdt", "n_jobs": -1, "verbose": -1, "random_state": 42, **best_params_rand}
-    
+    final_params_rand = {
+        "objective": obj,
+        "metric": metric,
+        "num_class": n_classes if n_classes > 2 else 1,
+        "boosting_type": "gbdt",
+        "n_jobs": -1,
+        "verbose": -1,
+        "random_state": 42,
+        **best_params_rand}
+
     final_model_rand = lgb.train(final_params_rand, rand_train_dataset, num_boost_round=400)
 
     y_prob_rand = final_model_rand.predict(X_test_rand)
-    
+
     if n_classes == 2 and y_prob_rand.ndim == 1:
         # Standardize 1D binary probabilities into standard 2D shape [P(c0), P(c1)]
         y_prob_rand_2d = np.zeros((len(y_prob_rand), 2))
@@ -240,7 +270,13 @@ for fold, (train_idx, test_idx) in enumerate(skf.split(X_df, y_cell)):
     os.makedirs(fold_dir, exist_ok=True)
 
     with open(os.path.join(fold_dir, "classification_report.txt"), "w") as f:
-        f.write(classification_report(Y_test_rand, y_pred_rand, labels=np.arange(n_classes), target_names=le_cell.classes_, zero_division=0))
+        f.write(
+            classification_report(
+                Y_test_rand,
+                y_pred_rand,
+                labels=np.arange(n_classes),
+                target_names=le_cell.classes_,
+                zero_division=0))
 
     np.save(os.path.join(fold_dir, "y_true.npy"), Y_test_rand)
     np.save(os.path.join(fold_dir, "y_pred.npy"), y_pred_rand)
@@ -256,7 +292,13 @@ for fold, (train_idx, test_idx) in enumerate(skf.split(X_df, y_cell)):
 print("\n=== GENERATING MASTER OVERALL CROSS-VALIDATION PERFORMANCE REPORTS ===")
 
 with open(os.path.join(CELLTYPE_DIR, "overall_classification_report.txt"), "w") as f:
-    f.write(classification_report(y_cell, oof_preds, labels=np.arange(n_classes), target_names=le_cell.classes_, zero_division=0))
+    f.write(
+        classification_report(
+            y_cell,
+            oof_preds,
+            labels=np.arange(n_classes),
+            target_names=le_cell.classes_,
+            zero_division=0))
 
 np.save(os.path.join(CELLTYPE_DIR, "oof_true.npy"), y_cell)
 np.save(os.path.join(CELLTYPE_DIR, "oof_pred.npy"), oof_preds)

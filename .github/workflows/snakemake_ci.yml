@@ -33,5 +33,9 @@ jobs:
       - name: Validate Snakefile syntax
         run: python -m py_compile pre_analysis.py LGB_celltype.py LGB_genotype.py scVI/scVI_analysis_celltype.py scVI/scVI_analysis_genotype.py
 
+      - name: Generate Dummy Input Data
+        run: |
+          touch object_integrated_assay3_annotated_final.modified.cleaned.updated.celltype2_only.h5ad
+
       - name: Snakemake dry run
         run: snakemake -n --cores 1

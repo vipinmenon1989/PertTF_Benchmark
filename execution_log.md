@@ -22,3 +22,13 @@ Pipeline started: Saturday, Jul 4, 2026
 - Created `.github/workflows/snakemake_ci.yml` (flake8 lint, py_compile, snakemake dry run).
 - Created comprehensive `README.md` with purpose, script details, DAG diagram, and run instructions.
 - Created `.gitignore` with strict exclusion policy per specification.
+
+## Phase 4: Git & GitHub Deployment
+- Initialized git repository in project root.
+- Connected remote: `https://github.com/vipinmenon1989/PertTF_Benchmark.git`.
+- Created and pushed `benchmark` branch (commit `98628b5`): 12 files including scripts, Snakefile, SLURM executor, CI workflow, README, logs.
+- Checked out `main` branch; force-added only `Snakefile`; committed (`0cde132`) and pushed.
+
+## CI/CD Fix (Jul 4, 2026)
+- **PEP 8 linting**: Ran `autopep8` on `LGB_celltype.py`, `LGB_genotype.py`, `scVI/scVI_analysis_celltype.py`, `scVI/scVI_analysis_genotype.py` to fix W291/W293 trailing whitespace and E302 blank-line spacing. Verified clean `flake8` pass.
+- **Dummy data for CI**: Added "Generate Dummy Input Data" step to `.github/workflows/snakemake_ci.yml` that creates the Snakefile's required h5ad input via `touch object_integrated_assay3_annotated_final.modified.cleaned.updated.celltype2_only.h5ad`, enabling DAG resolution on GitHub runners without the real dataset.
