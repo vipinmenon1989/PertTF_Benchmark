@@ -32,3 +32,7 @@ Pipeline started: Saturday, Jul 4, 2026
 ## CI/CD Fix (Jul 4, 2026)
 - **PEP 8 linting**: Ran `autopep8` on `LGB_celltype.py`, `LGB_genotype.py`, `scVI/scVI_analysis_celltype.py`, `scVI/scVI_analysis_genotype.py` to fix W291/W293 trailing whitespace and E302 blank-line spacing. Verified clean `flake8` pass.
 - **Dummy data for CI**: Added "Generate Dummy Input Data" step to `.github/workflows/snakemake_ci.yml` that creates the Snakefile's required h5ad input via `touch object_integrated_assay3_annotated_final.modified.cleaned.updated.celltype2_only.h5ad`, enabling DAG resolution on GitHub runners without the real dataset.
+
+## CI/CD Architecture Fix (Jul 4, 2026)
+- **Root cause**: Snakemake dry-run step ran on a bare Ubuntu runner without conda activation, causing `snakemake: command not found` (exit 127).
+- **Fix**: Rewrote `.github/workflows/snakemake_ci.yml` to use `conda-incubator/setup-miniconda@v3` with `activate-environment: pertTF_bench` (Python 3.10), install Snakemake via `conda install` before any pipeline steps, and set `shell: bash -el {0}` on all subsequent `run` steps so linting, dummy data generation, and `snakemake -n` execute inside the activated conda environment.
